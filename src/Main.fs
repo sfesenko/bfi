@@ -1,13 +1,10 @@
-module Main
+module Language.Brainfuck.Main
 
 open System.IO
 
 open Language.Brainfuck.Parser
 open Language.Brainfuck.Optimizer
 open Language.Brainfuck.Codegen
-
-let (>>=) a f = Result.bind f a
-let (<&>) a f = Result.map f a
 
 let openFile args =
   if Array.isEmpty args
@@ -19,12 +16,13 @@ let openFile args =
 let writeErrors = function
   | Ok _ -> 0
   | Error err ->
-      printfn "Error: %s" err
+      eprintfn "Error: %s" err
       1
 
 [<EntryPoint>]
 let main argv =
   openFile argv
-  >>= parse
-  <&> (optimize >> compileAndRun)
+  |> Result.bind parse
+  |> Result.map (optimize >> compile)
+  |> Result.map (fun x -> x () )
   |> writeErrors

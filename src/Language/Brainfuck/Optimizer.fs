@@ -2,8 +2,6 @@ module Language.Brainfuck.Optimizer
 
 open Language.Brainfuck.IR
 
-let maxPasses = 64
-
 let canDoWithOffset = function
   | Move _ | Loop _ -> false
   | _ -> true
@@ -14,10 +12,10 @@ let rec optimizeOnce' changed acc ops =
   | Move 0 :: rest -> optimizeOnce' true acc rest
 
   | Loop [Add -1y] :: rest
-  | Loop [Add 1y] :: rest -> optimizeOnce' true acc <| set0 :: rest
+  | Loop [Add 1y] :: rest -> optimizeOnce' true acc (set0 :: rest)
 
-  | Add _ :: (Read :: _ as rest)
-  | Set _ :: (Read :: _ as rest)
+  | Add _ :: (Input :: _ as rest)
+  | Set _ :: (Input :: _ as rest)
   | Add _ :: (Set _ :: _ as rest)
   | Set _ :: (Set _ :: _ as rest) -> optimizeOnce' true acc rest
 
@@ -25,7 +23,7 @@ let rec optimizeOnce' changed acc ops =
 
   | Add a :: Add b :: rest -> optimizeOnce' true acc <| Add (a + b) :: rest
   | Move a :: Move b :: rest -> optimizeOnce' true acc <| Move (a + b) :: rest
-  | Write a :: Write b :: rest -> optimizeOnce' true acc <| Write (a + b) :: rest
+  | Print a :: Print b :: rest -> optimizeOnce' true acc <| Print (a + b) :: rest
 
   | Set 0y as s :: Loop _ :: rest -> optimizeOnce' true acc <| s :: rest
 
@@ -47,14 +45,12 @@ let rec optimizeOnce' changed acc ops =
 
 let optimizeOnce = optimizeOnce' false []
 
-let rec optimize' passesLeft ops =
-  if passesLeft = 0
-  then ops
+let rec optimize' passesLeft (changed, ops) =
+  if passesLeft > 0 && changed = true then
+    optimizeOnce ops |> optimize' (passesLeft - 1)
   else
-    let changed, ops = optimizeOnce ops
+    ops
 
-    if not changed
-    then ops
-    else optimize' (passesLeft - 1) ops
-
-let optimize ops = optimize' maxPasses (set0 :: ops)
+let optimize ops = 
+  let passes = 64
+  optimize' passes (true, set0 :: ops)

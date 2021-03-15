@@ -28,15 +28,15 @@ let rec parse' inComment scope stack line col (src: char ReadOnlySpan) =
     | '-' -> parse' false (decr :: scope) stack nextLine nextCol nextSrc
     | '<' -> parse' false (moveL :: scope) stack nextLine nextCol nextSrc
     | '>' -> parse' false (moveR :: scope) stack nextLine nextCol nextSrc
-    | ',' -> parse' false (read :: scope) stack nextLine nextCol nextSrc
-    | '.' -> parse' false (write :: scope) stack nextLine nextCol nextSrc
+    | ',' -> parse' false (input :: scope) stack nextLine nextCol nextSrc
+    | '.' -> parse' false (print :: scope) stack nextLine nextCol nextSrc
     | '[' -> parse' false [] ((line, col, scope) :: stack) nextLine nextCol nextSrc
     | ']' ->
         match stack with
         | (_, _, parent) :: stack -> parse' false (Loop (List.rev scope) :: parent) stack nextLine nextCol nextSrc
         | [] -> err line col "Unmatched ']'."
-
-    | c when Char.IsWhiteSpace c -> parse' false scope stack nextLine nextCol nextSrc
-    | c -> err line col <| sprintf "Invalid character '%c'." c
+    | _ -> parse' false scope stack nextLine nextCol nextSrc // ignore all wrong characters
+    // | c when Char.IsWhiteSpace c -> parse' false scope stack nextLine nextCol nextSrc
+    // | c -> err line col <| sprintf "Invalid character '%c'." c
 
 let parse (src: string) = parse' false [] [] 1 1 (src.AsSpan())

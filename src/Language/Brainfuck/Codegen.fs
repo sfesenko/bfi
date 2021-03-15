@@ -5,16 +5,15 @@ open System.Reflection
 open System.Reflection.Emit
 open Language.Brainfuck.IR
 
-type IL = ILGenerator
-
-let tapeSize = 65_536
+type IL = Emit.ILGenerator
 
 let consoleRead = typeof<Console>.GetMethod("Read", Array.empty)
 let consoleWriteChar = typeof<Console>.GetMethod("Write", [|typeof<char>|])
 let consoleWriteString = typeof<Console>.GetMethod("Write", [|typeof<string>|])
 let stringCtor = typeof<string>.GetConstructor([|typeof<char>; typeof<int>|])
 
-let emitTapeAlloc (il: IL) =
+
+let emitTapeAlloc (il: IL) (tapeSize: int) =
   il.DeclareLocal(typeof<sbyte>.MakePointerType()) |> ignore
 
   il.Emit(OpCodes.Ldc_I4, tapeSize)
@@ -85,26 +84,25 @@ and emitOp (il: IL) offset = function
   | Add a -> emitAdd il offset a
   | Move m -> emitMove il m
   | Set s -> emitSet il offset s
-  | Read -> emitRead il offset
-  | Write n -> emitWrite il offset n
+  | Input -> emitRead il offset
+  | Print n -> emitWrite il offset n
   | WithOffset (off, op) -> emitOp il off op
   | Loop ops -> emitLoop il ops
 
-and emitOps' il = function
-  | [] -> ()
-  | op :: rest ->
-      emitOp il 0 op
-      emitOps' il rest
+and emitOps' il ops = 
+  for op in ops do
+    emitOp il 0 op
 
 let emitOps il ops =
-  emitTapeAlloc il
+  let tapeSize = 65_536
+  
+  emitTapeAlloc il tapeSize
   emitOps' il ops
-  il.Emit(OpCodes.Ret)
+  il.Emit OpCodes.Ret
 
-let compileAndRun ops =
+let compile ops =
   let asm = AssemblyBuilder.DefineDynamicAssembly(AssemblyName("Brainfuck"), AssemblyBuilderAccess.Run)
-  let mdl = asm.DefineDynamicModule("Module")
-  let ty = mdl.DefineType("Program")
+  let ty = asm.DefineDynamicModule("Module").DefineType("Program")
 
   let mtd = ty.DefineMethod("Main", MethodAttributes.Private ||| MethodAttributes.HideBySig ||| MethodAttributes.Static, typeof<Void>, Array.empty)
   let il = mtd.GetILGenerator()
@@ -113,6 +111,4 @@ let compileAndRun ops =
 
   let ty = ty.CreateType()
   let mtd = ty.GetMethod("Main", BindingFlags.NonPublic ||| BindingFlags.Static)
-
-  mtd.Invoke(null, Array.empty)
-  |> ignore
+  fun () -> mtd.Invoke(null, Array.empty) |> ignore
